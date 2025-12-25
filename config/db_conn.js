@@ -17,7 +17,7 @@ const mongo_database = process.env.MONGO_DBNAME || 'test';
 // and finally fall back to a local MongoDB instance.
 const mongoUri = process.env.MONGODB_URI || (
 	(mongo_username && mongo_password && mongo_cluster)
-		? `mongodb+srv://veasna:099514852@cluster0.pfguffi.mongodb.net/?appName=Cluster0`
+		? `mongodb+srv://${mongo_username}:${mongo_password}@cluster0.pfguffi.mongodb.net/${mongo_database}?retryWrites=true&w=majority`
 		: `mongodb://localhost:27017/${mongo_database}`
 );
 
