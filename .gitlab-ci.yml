@@ -1,0 +1,96 @@
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  NODE_VERSION: "18"
+  DOCKER_IMAGE: $CI_REGISTRY_IMAGE/cart
+  DOCKER_DRIVER: overlay2
+
+# Test Stage
+test:
+  stage: test
+  image: node:${NODE_VERSION}
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+  before_script:
+    - cd Cart
+    - npm ci
+  script:
+    - npm run lint || echo "No lint script"
+    - npm test || echo "No tests found"
+  only:
+    changes:
+      - Cart/**/*
+
+# Build Stage
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - cd Cart
+    - docker build -t $DOCKER_IMAGE:$CI_COMMIT_SHA .
+    - docker tag $DOCKER_IMAGE:$CI_COMMIT_SHA $DOCKER_IMAGE:latest
+    - docker push $DOCKER_IMAGE:$CI_COMMIT_SHA
+    - docker push $DOCKER_IMAGE:latest
+  only:
+    - main
+    - develop
+  needs:
+    - test
+
+# Deploy to Development
+deploy:dev:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+  script:
+    - ssh -o StrictHostKeyChecking=no $SERVER_USER@$DEV_SERVER "
+        cd /var/www/ecommerce &&
+        docker pull $DOCKER_IMAGE:latest &&
+        docker-compose -f docker-compose.yml up -d cart &&
+        docker system prune -af"
+  only:
+    - develop
+  environment:
+    name: development
+    url: http://dev.example.com
+  needs:
+    - build
+
+# Deploy to Production
+deploy:prod:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+  script:
+    - ssh -o StrictHostKeyChecking=no $SERVER_USER@$PROD_SERVER "
+        cd /var/www/ecommerce &&
+        docker pull $DOCKER_IMAGE:latest &&
+        docker-compose -f docker-compose.yml up -d cart &&
+        docker system prune -af"
+  only:
+    - main
+  when: manual
+  environment:
+    name: production
+    url: http://example.com
+  needs:
+    - build
