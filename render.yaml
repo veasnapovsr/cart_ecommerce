@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: cart-service
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    envVars:
+      - key: PORT
+        value: 3003
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_USERNAME
+        sync: false
+      - key: MONGO_PASSWORD
+        sync: false
+      - key: MONGO_CLUSTER
+        sync: false
+      - key: MONGO_DBNAME
+        value: cart
+      - key: ACCESS_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        sync: false
